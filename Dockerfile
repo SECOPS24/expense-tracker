@@ -2,6 +2,12 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Upgrade libc-bin and libc6 to patch CVE-2026-0915 (glibc DNS stack leak)
+RUN apt-get update && \
+    apt-get install -y --only-upgrade libc-bin libc6 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
