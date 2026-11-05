@@ -1,10 +1,23 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 import sqlite3
 import os
+import tempfile
 
 app = Flask(__name__)
-DB_PATH = os.environ.get("DB_PATH", "/data/expenses.db")
+
+# Fall back to a writable temp dir if /data isn't available
+_default_db = "/data/expenses.db"
+try:
+    os.makedirs("/data", exist_ok=True)
+    # Quick write-test
+    with open("/data/.writable", "w") as f:
+        f.write("ok")
+    os.unlink("/data/.writable")
+except OSError:
+    _default_db = os.path.join(tempfile.gettempdir(), "expenses.db")
+
+DB_PATH = os.environ.get("DB_PATH", _default_db)
 
 
 def get_db():
@@ -103,11 +116,19 @@ def summary():
     })
 
 
+# Health endpoint — no DB dependency so it always responds
 @app.route("/health")
 def health():
-    return jsonify({"status": "healthy"})
+    return jsonify({"status": "healthy"}), 200
+
+
+# Initialise DB on startup (after app is defined)
+with app.app_context():
+    try:
+        init_db()
+    except Exception as e:
+        app.logger.warning(f"init_db skipped: {e}")
 
 
 if __name__ == "__main__":
-    init_db()
-    app.run(host="0.0.0.0", port=8080, debug=False)
+    app.run(host="0.0.0.0", port=3000, debug=False)
